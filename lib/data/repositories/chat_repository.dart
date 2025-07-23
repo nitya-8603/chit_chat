@@ -1,3 +1,4 @@
+import 'package:chit_chat/data/models/chat_message_model.dart';
 import 'package:chit_chat/data/models/chat_room_model.dart';
 import 'package:chit_chat/data/services/base_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,6 +6,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ChatRepository extends baseRepository {
   CollectionReference get _chatRooms =>
       firebaseFirestore.collection('chatRooms');
+
+  CollectionReference getChatRoomMessages(String chatRoomId) {
+    return _chatRooms.doc(chatRoomId).collection('messages');
+  }
+
   Future<ChatRoomModel> getOrCreateChatRoom(
     String currentUserId,
     String otherUserId,
@@ -42,5 +48,32 @@ class ChatRepository extends baseRepository {
     );
     await _chatRooms.doc(roomId).set(newRoom.toMap());
     return newRoom;
+  }
+
+  Future<void> sendMessage({
+    required String senderId,
+    required String receiverId,
+    required String chatRoomId,
+    required String content,
+    MessageType type = MessageType.text,
+  }) async {
+    final batch = firebaseFirestore.batch();
+    final messageRef = getChatRoomMessages(chatRoomId);
+    final messageDoc = messageRef.doc();
+    final message = ChatMessageModel(
+      id: messageDoc.id,
+      chatRoomId: chatRoomId,
+      senderId: senderId,
+      receiverId: receiverId,
+      content: content,
+      timestamp: Timestamp.now(),
+      readBy: [senderId],
+    );
+    batch.set(messageDoc, message.toMap());
+    batch.update(_chatRooms.doc(chatRoomId), {
+      'lastMessage': content,
+      'lastMessageSenderId': senderId,
+      'lastMessageTime': message.timestamp,
+    });
   }
 }
