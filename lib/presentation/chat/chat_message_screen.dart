@@ -1,6 +1,11 @@
 import 'package:chit_chat/data/models/chat_message_model.dart';
+import 'package:chit_chat/data/services/service_locator.dart';
+import 'package:chit_chat/logic/cubits/chat/chat_cubit.dart';
+import 'package:chit_chat/logic/cubits/chat/chat_state.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 class ChatMessageScreen extends StatefulWidget {
   final String receiverName;
@@ -17,18 +22,50 @@ class ChatMessageScreen extends StatefulWidget {
 
 class _ChatMessageScreenState extends State<ChatMessageScreen> {
   final TextEditingController messageController = TextEditingController();
+  late final ChatCubit _chatCubit;
+  bool _isComposing = false;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _chatCubit = getIt<ChatCubit>();
+    _chatCubit.enterChat(widget.receiverId);
+    messageController.addListener(_onTextChanged);
+  }
+
+  Future<void> handleSendMessage() async {
+    final messageText = messageController.text.trim();
+    messageController.clear();
+    await _chatCubit.sendMessage(
+      content: messageText,
+      receiverId: widget.receiverId,
+    );
+  }
+
+  void _onTextChanged() {
+    final isComposing = messageController.text.isNotEmpty;
+    if (isComposing != _isComposing) {
+      setState(() {
+        _isComposing = isComposing;
+      });
+    }
+    if (isComposing) {
+      _chatCubit.startTyping();
+    }
+  }
+
   @override
   void dispose() {
     // TODO: implement dispose
     super.dispose();
     messageController.dispose();
+    _chatCubit.leaveChat();
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        centerTitle: false,
         title: Row(
           children: [
             CircleAvatar(
@@ -36,74 +73,108 @@ class _ChatMessageScreenState extends State<ChatMessageScreen> {
               child: Text(widget.receiverName[0].toUpperCase()),
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.receiverName),
-                  Text(
-                    'Online',
-                    style: TextStyle(fontSize: 16, color: Colors.green),
-                  ),
-                ],
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.receiverName),
+                BlocBuilder<ChatCubit, ChatState>(
+                  bloc: _chatCubit,
+                  builder: (context, state) {
+                    if (state.isReceiverTyping) {
+                      return Row(
+                        children: [
+                          Container(margin: const EdgeInsets.only(right: 4)),
+                          Text(
+                            "typing",
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    if (state.isReceiverOnline) {
+                      return const Text(
+                        "Online",
+                        style: TextStyle(fontSize: 14, color: Colors.green),
+                      );
+                    }
+                    if (state.receiverLastSeen != null) {
+                      final lastSeen = state.receiverLastSeen!.toDate();
+                      return Text(
+                        "last seen at ${DateFormat('h:mm a').format(lastSeen)}",
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                      );
+                    }
+                    return const SizedBox();
+                  },
+                ),
+              ],
             ),
           ],
         ),
         actions: [Icon(Icons.more_vert)],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: 4,
-              itemBuilder: (context, index) {
-                return MessageBubble(
-                  message: ChatMessageModel(
-                    id: "12345678945",
-                    chatRoomId: "12345678",
-                    senderId: "1254945626",
-                    receiverId: "265484561",
-                    content: "hello!",
-                    timestamp: Timestamp.now(),
-                    readBy: [],
-                    status: MessageStatus.read,
-                  ),
-                  isMe: true,
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Icon(Icons.emoji_emotions),
-                Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    textCapitalization: TextCapitalization.sentences,
-                    keyboardType: TextInputType.multiline,
-                    decoration: InputDecoration(
-                      hintText: 'Type a message',
-                      filled: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      fillColor: Theme.of(context).cardColor,
-                    ),
-                  ),
+      body: BlocBuilder<ChatCubit, ChatState>(
+        bloc: _chatCubit,
+        builder: (context, state) {
+          if (state.status == chatStatus.loading)
+            return Center(child: CircularProgressIndicator());
+          if (state.status == chatStatus.error) {
+            return Center(child: Text(state.error ?? 'something went wrong!'));
+          }
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  reverse: true,
+                  itemCount: state.messages.length,
+                  itemBuilder: (context, index) {
+                    final message = state.messages[index];
+                    final isMe = message.senderId == _chatCubit.currentUserId;
+
+                    return MessageBubble(message: message, isMe: isMe);
+                  },
                 ),
-                Icon(Icons.send, color: Theme.of(context).primaryColor),
-              ],
-            ),
-          ),
-        ],
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.emoji_emotions),
+                    Expanded(
+                      child: TextField(
+                        controller: messageController,
+                        textCapitalization: TextCapitalization.sentences,
+                        keyboardType: TextInputType.multiline,
+                        decoration: InputDecoration(
+                          hintText: 'Type a message',
+                          filled: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                          fillColor: Theme.of(context).cardColor,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: handleSendMessage,
+                      icon: Icon(
+                        Icons.send,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -151,15 +222,16 @@ class MessageBubble extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '4:54AM',
+                  DateFormat('h:mm a').format(message.timestamp.toDate()),
                   style: TextStyle(color: isMe ? Colors.white : Colors.black),
                 ),
-                Icon(
-                  Icons.done_all_rounded,
-                  color: message.status == MessageStatus.read
-                      ? Colors.indigo
-                      : Colors.grey,
-                ),
+                if (isMe)
+                  Icon(
+                    Icons.done_all_rounded,
+                    color: message.status == MessageStatus.read
+                        ? Colors.indigo
+                        : Colors.grey,
+                  ),
               ],
             ),
           ],

@@ -1,6 +1,8 @@
 import 'package:chit_chat/data/repositories/auth_repository.dart';
+import 'package:chit_chat/data/repositories/chat_repository.dart';
 import 'package:chit_chat/data/repositories/contact_repository.dart';
 import 'package:chit_chat/logic/cubits/auth/auth_cubit.dart';
+import 'package:chit_chat/logic/cubits/chat/chat_cubit.dart';
 import 'package:chit_chat/router/app_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,9 +18,16 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton(() => AppRouter());
   getIt.registerLazySingleton(() => AuthRepository());
   getIt.registerLazySingleton(() => ContactRepository());
+  getIt.registerLazySingleton(() => ChatRepository());
   getIt.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
   getIt.registerLazySingleton(() => FirebaseFirestore.instance);
   getIt.registerLazySingleton(
     () => AuthCubit(authRepository: AuthRepository()),
+  );
+  getIt.registerFactory(
+    () => ChatCubit(
+      chatRepository: ChatRepository(),
+      currentUserId: getIt<FirebaseAuth>().currentUser!.uid,
+    ),
   );
 }

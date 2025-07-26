@@ -27,6 +27,9 @@ class AuthCubit extends Cubit<AuthState> {
         } catch (e) {
           emit(state.copyWith(status: AuthStatus.unauthenticated));
         }
+      } else {
+        // 👇 This was missing
+        emit(state.copyWith(status: AuthStatus.unauthenticated));
       }
     });
   }
