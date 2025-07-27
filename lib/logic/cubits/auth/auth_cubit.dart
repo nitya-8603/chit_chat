@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:chit_chat/data/repositories/auth_repository.dart';
+import 'package:chit_chat/data/repositories/chat_repository.dart';
 import 'package:chit_chat/logic/cubits/auth/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,10 +8,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository _authRepository;
   StreamSubscription<User?>? _authStateSubscription;
+  final ChatRepository? _chatRepository;
 
-  AuthCubit({required AuthRepository authRepository})
-    : _authRepository = authRepository,
-      super(const AuthState()) {
+  AuthCubit({
+    required ChatRepository chatRepository,
+    required AuthRepository authRepository,
+  }) : _authRepository = authRepository,
+       _chatRepository = chatRepository,
+       super(const AuthState()) {
     _init();
   }
   void _init() {
@@ -71,6 +76,8 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> signOut() async {
     try {
+      if (state.user != null)
+        await _chatRepository?.updateOnlineStatus(state.user!.uid, false);
       await _authRepository.signOut();
       emit(state.copyWith(status: AuthStatus.unauthenticated, user: null));
     } catch (e) {

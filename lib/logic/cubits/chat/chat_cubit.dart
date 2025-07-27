@@ -44,7 +44,7 @@ class ChatCubit extends Cubit<ChatState> {
       _subscribeToMessages(chatRoom.id);
       _subscribeToOnlineStatus(receiverId);
       _subscribeToTypingStatus(chatRoom.id);
-      //_subscribeToBlockStatus(receiverId);
+      _subscribeToBlockStatus(receiverId);
 
       await _chatRepository.updateOnlineStatus(currentUserId, true);
     } catch (e) {
@@ -184,6 +184,27 @@ class ChatCubit extends Cubit<ChatState> {
         );
   }
 
+  void _subscribeToBlockStatus(String otherUserId) {
+    _blockStatusSubscription?.cancel();
+    _blockStatusSubscription = _chatRepository
+        .isUserBlocked(currentUserId, otherUserId)
+        .listen(
+          (isBlocked) {
+            emit(state.copyWith(isUserBlocked: isBlocked));
+
+            _amIBlockStatusSubscription?.cancel();
+            _blockStatusSubscription = _chatRepository
+                .amIBlocked(currentUserId, otherUserId)
+                .listen((isBlocked) {
+                  emit(state.copyWith(amIBlocked: isBlocked));
+                });
+          },
+          onError: (error) {
+            print("error getting online status");
+          },
+        );
+  }
+
   void startTyping() {
     if (state.chatRoomId == null) return;
     typingTimer?.cancel();
@@ -204,6 +225,22 @@ class ChatCubit extends Cubit<ChatState> {
       );
     } catch (e) {
       print("error updating typing status $e");
+    }
+  }
+
+  Future<void> blockUser(String userId) async {
+    try {
+      await _chatRepository.blockUser(currentUserId, userId);
+    } catch (e) {
+      emit(state.copyWith(error: 'failed to block user $e'));
+    }
+  }
+
+  Future<void> unBlockUser(String userId) async {
+    try {
+      await _chatRepository.unBlockUser(currentUserId, userId);
+    } catch (e) {
+      emit(state.copyWith(error: 'failed to unblock user $e'));
     }
   }
 

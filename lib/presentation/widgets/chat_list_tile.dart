@@ -14,11 +14,16 @@ class ChatListTile extends StatelessWidget {
     required this.onTap,
   });
 
-  String _getOtherUserName() {
-    final otherUserId = chat.participants.firstWhere(
-      (id) => id != currentUserId,
-    );
-    return chat.participantsName![otherUserId] ?? 'Unknown';
+  String _getOtherUsername() {
+    try {
+      final otherUserId = chat.participants.firstWhere(
+        (id) => id != currentUserId,
+        orElse: () => 'Unknown User',
+      );
+      return chat.participantsName?[otherUserId] ?? "Unknown User";
+    } catch (e) {
+      return "Unknown User";
+    }
   }
 
   @override
@@ -27,11 +32,14 @@ class ChatListTile extends StatelessWidget {
       onTap: onTap,
       leading: CircleAvatar(
         backgroundColor: Theme.of(context).primaryColor.withOpacity(0.5),
-        child: Text(_getOtherUserName()[0].toUpperCase()),
+        child: Text(
+          _getOtherUsername()[0].toUpperCase(),
+          style: TextStyle(color: Colors.white),
+        ),
       ),
       title: Text(
-        _getOtherUserName(),
-        style: TextStyle(fontWeight: FontWeight.bold),
+        _getOtherUsername(),
+        style: const TextStyle(fontWeight: FontWeight.bold),
       ),
       subtitle: Row(
         children: [
@@ -46,20 +54,20 @@ class ChatListTile extends StatelessWidget {
         ],
       ),
       trailing: StreamBuilder<int>(
-        stream: getIt<ChatRepository>().getUnreadCount(currentUserId, chat.id),
+        stream: getIt<ChatRepository>().getUnreadCount(chat.id, currentUserId),
         builder: (context, snapshot) {
           if (!snapshot.hasData || snapshot.data == 0) {
-            return SizedBox();
+            return const SizedBox();
           }
           return Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.green,
               shape: BoxShape.circle,
             ),
             child: Text(
               snapshot.data.toString(),
-              style: TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white),
             ),
           );
         },

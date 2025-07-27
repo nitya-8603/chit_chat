@@ -97,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        actionsPadding: EdgeInsets.all(16),
         title: Text('Chats'),
         actions: [
           InkWell(

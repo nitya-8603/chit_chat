@@ -15,18 +15,30 @@ final getIt = GetIt.instance;
 Future<void> setupServiceLocator() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
   getIt.registerLazySingleton(() => AppRouter());
+
+  // Register repositories
   getIt.registerLazySingleton(() => AuthRepository());
   getIt.registerLazySingleton(() => ContactRepository());
   getIt.registerLazySingleton(() => ChatRepository());
+
+  // Firebase instances
   getIt.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
   getIt.registerLazySingleton(() => FirebaseFirestore.instance);
+
+  // Update AuthCubit to include ChatRepository
   getIt.registerLazySingleton(
-    () => AuthCubit(authRepository: AuthRepository()),
+    () => AuthCubit(
+      authRepository: getIt<AuthRepository>(),
+      chatRepository: getIt<ChatRepository>(),
+    ),
   );
+
+  // ChatCubit (safe with factory because of user-dependent state)
   getIt.registerFactory(
     () => ChatCubit(
-      chatRepository: ChatRepository(),
+      chatRepository: getIt<ChatRepository>(),
       currentUserId: getIt<FirebaseAuth>().currentUser!.uid,
     ),
   );

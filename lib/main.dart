@@ -56,24 +56,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ChitChat',
-      navigatorKey: getIt<AppRouter>().navigatorKey,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: BlocBuilder<AuthCubit, AuthState>(
-        bloc: getIt<AuthCubit>(),
-        builder: (context, state) {
-          if (state.status == AuthStatus.initial) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (state.status == AuthStatus.authenticated) {
-            return const HomeScreen();
-          }
-          return const LoginScreen();
-        },
+    return GestureDetector(
+      onTap: () {
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: MaterialApp(
+        title: 'ChitChat',
+        navigatorKey: getIt<AppRouter>().navigatorKey,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: BlocBuilder<AuthCubit, AuthState>(
+          bloc: getIt<AuthCubit>(),
+          builder: (context, state) {
+            if (state.status == AuthStatus.initial) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (state.status == AuthStatus.authenticated) {
+              return const HomeScreen();
+            }
+            return const LoginScreen();
+          },
+        ),
       ),
     );
   }
